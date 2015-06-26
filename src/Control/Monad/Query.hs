@@ -46,29 +46,21 @@ instance MonadTrans (QueryT a b) where
 query :: a -> QueryT a b m b
 query r = QReq r QPure
 
-runQueryTM :: (Traversable t, Monad t, Monad m) => (a -> m b) -> QueryT a b t r -> m (t r)
+runQueryTM :: (Traversable t, Monad t, Monad m) => (a -> m (t b)) -> QueryT a b t r -> m (t r)
 runQueryTM f q = case q of
                    QPure x  -> return (return x)
                    QLift mx -> fmap join . sequence . fmap (runQueryTM f) $ mx      -- better way?
-                   QReq r g -> runQueryTM f . g =<< f r
+                   QReq r g -> fmap join . sequence . fmap (runQueryTM f . g) =<< f r
 
 runQueryM :: Monad m => (a -> m b) -> Query a b r -> m r
-runQueryM f = fmap runIdentity . runQueryTM f
+runQueryM f = fmap runIdentity . runQueryTM (fmap Identity . f)
 
-runQueryT :: Monad t => (a -> b) -> QueryT a b t r -> t r
+runQueryT :: Monad t => (a -> t b) -> QueryT a b t r -> t r
 runQueryT f q = case q of
                   QPure x  -> return x
                   QLift mx -> runQueryT f =<< mx
-                  QReq r g -> runQueryT f . g $ f r
+                  QReq r g -> runQueryT f . g =<< f r
 
 runQuery :: (a -> b) -> Query a b r -> r
-runQuery f = runIdentity . runQueryT f
-
--- onLookup :: (a -> Maybe b) -> QueryT a b Maybe r -> Maybe r
--- onLookup f = runQueryM
-
--- data Foo = Foo { fooBar :: String
---                , fooBaz :: Int
---                }
-
+runQuery f = runIdentity . runQueryT (Identity . f)
 
