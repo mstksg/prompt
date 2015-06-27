@@ -91,3 +91,4 @@ interactP :: Prompt String String r -> IO r
 interactP = flip runPromptM $ \str -> do
     putStrLn str
     getLine
+

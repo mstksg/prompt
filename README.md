@@ -91,7 +91,10 @@ promptFoo2 :: PromptT String String Maybe Foo
 promptFoo2 = do
     bar <- prompt "bar"
     x   <- prompt "baz"
-    lift $ readMaybe x
+    case readMaybe x of
+      Just baz -> return baz
+      Nothing  -> mzero
+    -- also is `lift (readMaybe x)`
 ~~~
 
 So now we have the ability to add pure short-circuiting.
