@@ -1,5 +1,5 @@
 prompt
-=====
+======
 
 Monad and monad transformer for delayed-effect "pure" prompt-and-respose
 queries.
@@ -12,8 +12,9 @@ Prompt
 
 By "pure", I mean that the actual eventual process of *answering* the prompts
 might be effectful (it might involve IO, or state, or STM...like database
-queries or prompts to a user).  However, we don't worry about those for now.
-We **pretend that the prompting is pure**, and move on from there.
+queries or prompts to a user).  When we're writing our actual logic, we never
+involve anything with IO, State, etc., so we don't unleash a whole can of
+worms by using, for example, a monad transformer over `IO`.
 
 ~~~haskell
 import Control.Monad.Prompt
@@ -52,10 +53,9 @@ ghci> runPromptM promptFoo getEnv
 Foo "hello!" 8
 ~~~
 
-`promptFoo` is completely "pure" --- we *pretend* that `prompt "bar"` is pure,
-because we don't ever assume IO or anything in the type.  So we can run
-`promptFoo` in `IO` if we wanted, like above...or we can even run "without"
-IO, too:
+`promptFoo` is completely "pure", and doesn't ever involve IO or anything, and
+doesn't even have IO in the type.  We can run `promptFoo` in `IO` if we
+wanted, like above...or we can even run "without" IO, too:
 
 ~~~haskell
 ghci> import qualified Data.Map as M
@@ -66,13 +66,19 @@ ghci> runPrompt promptFoo (testMap M.!)
 Foo "hello!" 8
 ~~~
 
+Now you can do things like querying databases, prompting the user, etc.,
+without ever involving `IO` at all in your logic.  With a `Prompt`, we can
+worry that it will never produce arbitrary IO effects!  You can be certain
+that a `Prompt` will never call `launchMissiles`, like a `getFoo :: IO Foo`
+might!
+
 PromptT
 -------
 
-`PromptT a b t r` allows your prompting-and-responding to take place in the context of
-`Traversable` `t`, so you can do things like short-circuiting with `Either e`
-or `Maybe`, or multiple branches for `[]`, etc --- all "purely", without
-worrying about the eventual effects like IO.
+`PromptT a b t r` allows your prompting-and-responding to take place in the
+context of `Traversable` `t`, so you can do things like short-circuiting with
+`Either e` or `Maybe`, or multiple branches for `[]`, etc --- all "purely",
+without worrying about the eventual effects like IO.
 
 ~~~haskell
 import Control.Monad.Trans
@@ -118,6 +124,9 @@ baz         -- stdout prompt
 > i am baz  -- stdin response typed in
 Just (Foo "hello!" 8)  -- result
 ~~~
+
+Now, you can program in a short-circuiting context, etc., and not ever open
+the door to arbitrary `IO` like a `MaybeT IO a` would!
 
 For more advanced usage, there is a `MonadError` instance, so you can have
 `PromptT a b (Either e) r` with things like `throwError` and `catchError` to
