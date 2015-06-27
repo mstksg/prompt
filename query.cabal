@@ -3,14 +3,14 @@
 
 name:                query
 version:             0.1.0.0
-synopsis:            Query Monad, typeclass, and Monad Transformer
+synopsis:            Monad transformer for deferred-effect pure queries
 -- description:         
 homepage:            https://github.com/mstksg/query
 license:             MIT
 license-file:        LICENSE
 author:              Justin Le
 maintainer:          justin@jle.im
--- copyright:           
+copyright:           (c) 2015 Justin Le
 category:            Control
 build-type:          Simple
 -- extra-source-files:  
