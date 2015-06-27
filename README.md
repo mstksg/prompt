@@ -32,6 +32,8 @@ strings in return.
 Let's build a `Foo` from stdin/stdout:
 
 ~~~haskell
+ghci> :t runPromptM
+runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
 ghci> runPromptM promptFoo $ \prmpt -> do putStrLn prmpt; getLine
 bar         -- stdout prompt
 > hello!    -- stdin response typed in
@@ -58,6 +60,8 @@ IO, too:
 ~~~haskell
 ghci> import qualified Data.Map as M
 ghci> let testMap = M.fromList [("bar", "hello!"), ("baz", "i am baz")]
+ghci> :t runPrompt
+runPrompt :: Prompt a b r -> (a -> b) -> r
 ghci> runPrompt promptFoo (testMap M.!)
 Foo "hello!" 8
 ~~~
@@ -71,6 +75,8 @@ or `Maybe`, or multiple branches for `[]`, etc --- all "purely", without
 worrying about the eventual effects like IO.
 
 ~~~haskell
+import Control.Monad.Trans
+import Control.Monad.Prompt
 import Text.Read
 
 promptFoo2 :: PromptT String String (Either Int) Foo
@@ -83,6 +89,8 @@ promptFoo2 = do
 So now we have the ability to add pure short-circuiting.
 
 ~~~haskell
+ghci> :t runPromptTM
+runPromptTM :: Monad m => PromptT a b t r -> (a -> m (t b)) -> m (t r)
 ghci> runPromptTM promptFoo2 (fmap Just . getEnv)
 Nothing
 ghci> runPromptTM (promptFoo2 <|> return (Foo "error" 0)) (fmap Just . getEnv)
@@ -114,3 +122,44 @@ Just (Foo "hello!" 8)  -- result
 For more advanced usage, there is a `MonadError` instance, so you can have
 `PromptT a b (Either e) r` with things like `throwError` and `catchError` to
 "catch" an error value and respond/recover.
+
+Your "prompting effect" also has access to the underlying `Traversable` `t`,
+so you can mix and match sources of error from between your `Prompt` and also
+your prompt effect result.
+
+~~~haskell
+import Control.Monad.Error.Class
+import Control.Monad.Prompt
+import Text.Read
+import qualified Data.Map as M
+
+type Key = String
+type Val = String
+
+data MyError = MENoParse Key Val
+             | MENotFound Key
+             deriving Show
+
+promptRead :: Read a => a -> PromptT Key Val (Either MyError) b
+promptRead k = do
+    resp <- prompt k
+    case readMaybe resp of
+      Nothing -> throwError $ MEParse k resp
+      Just v  -> return v
+
+promptFoo3 :: PromptT Key Val (Either MyError) b
+promptFoo3 = Foo <$> prompt "bar" <*> promptRead "baz"
+
+throughEnv :: IO (Either MyError Foo)
+throughEnv = runPromptTM parseFoo3 $ \k -> do
+    env <- lookupEnv
+    case env of
+      Nothing -> return . Left  $ MENotFound k
+      Just v  -> return . Right $ v
+
+throughMap :: M.Map Key Val -> Either MyError Foo
+throughMap m = runPromptT parseFoo3 $ \k ->
+    case M.lookup k m of
+      Nothing -> Left (MENotFound k)
+      Just v  -> Right v
+~~~
