@@ -1,8 +1,7 @@
 prompt
 ======
 
-Monad and monad transformer for delayed-effect "pure" prompt-and-respose
-queries.
+Monad and transformer for delayed-effect "pure" prompt-and-respose queries.
 
 Prompt
 ------
@@ -166,10 +165,21 @@ promptFoo3 = Foo <$> prompt "bar" <*> promptRead "baz"
 
 throughEnv :: IO (Either MyError Foo)
 throughEnv = runPromptTM parseFoo3 $ \k -> do
-    env <- lookupEnv
+    env <- lookupEnv k
     case env of
       Nothing -> return . Left  $ MENotFound k
       Just v  -> return . Right $ v
+
+throughStdIO :: IO (Either MyError Foo)
+throughStdIO = interactPT parseFoo3
+
+throughStdIOBlankIsError :: IO (Either MyError Foo)
+throughStdIOBlankIsError = runPromptTM parseFoo3 $ \k -> do
+    putStrLn k
+    resp <- getLine
+    if null resp
+      then return . Left  $ MENotFound k
+      else return . Right $ resp
 
 throughMap :: M.Map Key Val -> Either MyError Foo
 throughMap m = runPromptT parseFoo3 $ \k ->
