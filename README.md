@@ -1,7 +1,7 @@
 prompt
 ======
 
-Monad and transformer for delayed-effect "pure" prompt-and-respose queries.
+Monad (and transformer) for delayed-effect "pure" prompt-and-respose queries.
 
 Prompt
 ------
@@ -73,6 +73,45 @@ worry that it will never produce arbitrary IO effects!  You can be certain
 that a `Prompt` will never call `launchMissiles`, like a `getFoo :: IO Foo`
 might!
 
+With Transformers
+-----------------
+
+`Prompt a b` can be used as monad to transform for any monad transformer to
+give an "interactive source" at the bottom of any monad transformer.
+
+Have you ever wanted to have `State`, with some aspect of IO, like writing to
+a database, doing network interactions, or querying a database, but didn't
+want to have an ugly terrible `StateT s IO`?  Well, wish no more!  You can
+have `StateT s (Prompt String String) a`, for a `State s` computation that can
+occasionally depend on asking the user, or the environment variables, or a
+network connection, or a database in IO or whatever.  But now you can be sure
+it won't ever do arbitrary IO --- it'll only do exactly what IO it needs that
+you specify when you "run" it.  Your "pure" computation doesn't involve IO at
+all!  All you added was an extra "promptable source".
+
+You can also play with using for the return type.  For example:
+
+~~~haskell
+logEvens :: StateT Int (Prompt String ()) ()
+logEvens = do
+    modify (+1)
+    x <- get
+    when (even x) . lift $ prompt (show x)
+~~~
+
+~~~haskell
+> runPromptM (runStateT (replicateM 10 logEvens) 0) putStrLn
+2
+4
+6
+8
+10
+~~~
+
+That gives you streaming logging, or streaming writing-to-a-database, etc.
+
+Note that `Prompt () r` is equivalent to `Reader r`.
+
 PromptT
 -------
 
@@ -131,6 +170,11 @@ Just (Foo "hello!" 8)  -- result
 
 Now, you can program in a short-circuiting context, etc., and not ever open
 the door to arbitrary `IO` like a `MaybeT IO a` would!
+
+If `t` has a monad transformer version, then `PromptT a b (t Identity) r` is
+more or less equivalent to `t (Prompt a b) r` --- so the above examples are
+equivalent to `MaybeT (Prompt a b) r`.  So the transforming part is a bit
+redundant...but it can make some code more concise if used properly.
 
 For more advanced usage, there is a `MonadError` instance, so you can have
 `PromptT a b (Either e) r` with things like `throwError` and `catchError` to

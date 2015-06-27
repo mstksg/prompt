@@ -3,7 +3,7 @@
 
 name:                prompt
 version:             0.1.0.0
-synopsis:            Monad and transformer for deferred-effect pure
+synopsis:            Monad (and transformer) for deferred-effect pure
                      prompt-response queries
 -- description:         
 homepage:            https://github.com/mstksg/prompt
