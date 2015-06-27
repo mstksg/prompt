@@ -20,7 +20,7 @@ data PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t 
 type Prompt a b = PromptT a b Identity
 
 instance Functor t => Functor (PromptT a b t) where
-    fmap f (PromptT q) = PromptT $ (fmap . fmap) f . q
+    fmap f (PromptT p) = PromptT $ (fmap . fmap) f . p
 
 instance Applicative t => Applicative (PromptT a b t) where
     pure x = PromptT $ const (return (pure x))
@@ -32,8 +32,8 @@ instance Alternative t => Alternative (PromptT a b t) where
 
 instance (Monad t, Traversable t) => Monad (PromptT a b t) where
     return x = PromptT $ const (return (return x))
-    PromptT q >>= f = PromptT $ \g -> do
-        PromptT x <- traverse f <$> q g
+    PromptT p >>= f = PromptT $ \g -> do
+        PromptT x <- traverse f <$> p g
         join <$> x g
 
 instance (MonadPlus t, Traversable t) => MonadPlus (PromptT a b t) where
@@ -45,10 +45,10 @@ instance MonadTrans (PromptT a b) where
 
 instance (MonadError e t, Traversable t) => MonadError e (PromptT a b t) where
     throwError = lift . throwError
-    catchError (PromptT q) f = PromptT $ \g -> do
-      x <- q g
-      let PromptT q' = sequence $ fmap return x `catchError` \e -> return (f e)
-      join <$> q' g
+    catchError (PromptT p) f = PromptT $ \g -> do
+      x <- p g
+      let PromptT p' = sequence $ fmap return x `catchError` \e -> return (f e)
+      join <$> p' g
 
 instance (MonadReader r t, Traversable t) => MonadReader r (PromptT a b t) where
     ask = lift ask
@@ -67,19 +67,19 @@ instance (MonadWriter w t, Traversable t) => MonadWriter w (PromptT a b t) where
     pass = hoistP pass
 
 hoistP :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
-hoistP f (PromptT q) = PromptT $ fmap f . q
+hoistP f (PromptT p) = PromptT $ fmap f . p
 
 prompt :: Applicative t => a -> PromptT a b t b
 prompt r = PromptT ($ r)
 
 runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
-runPromptM (PromptT q) f = runIdentity <$> q (fmap Identity . f)
+runPromptM (PromptT p) f = runIdentity <$> p (fmap Identity . f)
 
 runPromptT :: PromptT a b t r -> (a -> t b) -> t r
-runPromptT (PromptT q) f = runIdentity $ q (Identity . f)
+runPromptT (PromptT p) f = runIdentity $ p (Identity . f)
 
 runPrompt :: Prompt a b r -> (a -> b) -> r
-runPrompt (PromptT q) f = runIdentity . runIdentity $ q (Identity . Identity . f)
+runPrompt (PromptT p) f = runIdentity . runIdentity $ p (Identity . Identity . f)
 
 interactPT :: Applicative t => PromptT String String t r -> IO (t r)
 interactPT = flip runPromptTM $ \str -> do
