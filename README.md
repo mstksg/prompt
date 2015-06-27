@@ -43,6 +43,8 @@ baz         -- stdout prompt
 Foo "hello!" 8  -- result
 ~~~
 
+(by the way, that's also `interactP promptFoo`)
+
 Now let's build one by asking for environment variables
 
 ~~~haskell
@@ -107,13 +109,13 @@ Just (Foo "hello!" 19)
 ~~~
 
 ~~~haskell
-ghci> runPromptTM (promptFoo2 <|> promptFoo2) $ \prmpt -> putStrLn prmpt; Just <$> getLine
+ghci> runPromptTM (promptFoo2 <|> promptFoo) $ \prmpt -> putStrLn prmpt; Just <$> getLine
 bar         -- stdout prompt
 > hello!    -- stdin response typed in
 baz         -- stdout prompt
 > 19        -- stdin response typed in
 Just (Foo "hello!" 19)  -- result
-ghci> runPromptTM (promptFoo2 <|> promptFoo) $ \prmpt -> putStrLn prmpt; Just <$> getLine
+ghci> interactPT $ promptFoo2 <|> promptFoo     -- the same thing, using `interactPT`
 bar         -- stdout prompt
 > hello!    -- stdin response typed in
 baz         -- stdout prompt
