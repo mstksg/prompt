@@ -89,6 +89,8 @@ it won't ever do arbitrary IO --- it'll only do exactly what IO it needs that
 you specify when you "run" it.  Your "pure" computation doesn't involve IO at
 all!  All you added was an extra "promptable source".
 
+You can also use this to get short-circuiting behavior with `MaybeT`, etc.
+
 You can also play with using for the return type.  For example:
 
 ~~~haskell
@@ -111,6 +113,21 @@ logEvens = do
 That gives you streaming logging, or streaming writing-to-a-database, etc.
 
 Note that `Prompt () r` is equivalent to `Reader r`.
+
+### Typeclass
+
+There's also the typeclass `MonadPrompt` offered, which allows you to write
+code polymorphic over all things that can be "prompted".  For example, the
+above example can be written as:
+
+~~~haskell
+logEvens :: (MonadState Int m, MonadPrompt String () m) => m ()
+logEvens = do
+    modify (+1)
+    x <- get
+    when (even x) $ prompt (show x)
+~~~
+
 
 PromptT
 -------
@@ -259,10 +276,13 @@ This type is also similar in structure to `Bazaar`, from the *lens* package.
 However, `Bazaar` forces the "prompting effect" to take place in the same
 context as the `Traversable` `t`...which really defeats the purpose of this
 whole thing in the first place (the idea is to be able to separate your
-prompting effect from your application logic).  You would be able to model
-something like `Prompt` and `runPrompt` if you keep all your `Bazaar`
-functions parameterized over all `m`, but even compared to `runPromptM`,
-`Bazaar` is too unconstrained.
+prompting effect from your application logic).  If the `Traversable` you want
+to transform has a "monad transformer" version, then you can somewhat simulate
+`PromptT` for that specifc `t` with the transformer version.  But the bigger
+fundamental problem is that `Bazaar` can't have a monad instance because it is
+RankN parameterized over `Applicative` only, and not `Monad`.  So you can't
+use it to do the monadic things described here, which may or may not be okay
+for your purposes.
 
 It's also somewhat similar to the `Client` type from *pipes*, but it's also
 a bit tricky to use that with a different effect type than the logic
