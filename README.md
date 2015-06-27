@@ -140,7 +140,7 @@ data MyError = MENoParse Key Val
              | MENotFound Key
              deriving Show
 
-promptRead :: Read a => a -> PromptT Key Val (Either MyError) b
+promptRead :: Key -> PromptT Key Val (Either MyError) b
 promptRead k = do
     resp <- prompt k
     case readMaybe resp of
