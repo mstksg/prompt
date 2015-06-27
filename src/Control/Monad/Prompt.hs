@@ -14,7 +14,6 @@ import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Functor.Identity
-import Text.Read (readMaybe)
 
 data PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
 
@@ -54,7 +53,7 @@ instance (MonadError e t, Traversable t) => MonadError e (PromptT a b t) where
 instance (MonadReader r t, Traversable t) => MonadReader r (PromptT a b t) where
     ask = lift ask
     reader = lift . reader
-    local = hoistP . local
+    local = mapPrompt . local
 
 instance (MonadState s t, Traversable t) => MonadState s (PromptT a b t) where
     get = lift get
@@ -64,11 +63,20 @@ instance (MonadState s t, Traversable t) => MonadState s (PromptT a b t) where
 instance (MonadWriter w t, Traversable t) => MonadWriter w (PromptT a b t) where
     writer = lift . writer
     tell = lift . tell
-    listen = hoistP listen
-    pass = hoistP pass
+    listen = mapPrompt listen
+    pass = mapPrompt pass
 
-hoistP :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
-hoistP f (PromptT p) = PromptT $ fmap f . p
+mapPrompt :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
+mapPrompt f (PromptT p) = PromptT $ fmap f . p
+
+hoistIsoP :: (forall s. t s -> u s)
+          -> (forall s. u s -> t s)
+          -> PromptT a b t r
+          -> PromptT a b u r
+hoistIsoP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
+
+liftP :: Applicative t => t r -> PromptT a b t r
+liftP x = PromptT $ const (pure x)
 
 prompt :: a -> PromptT a b t b
 prompt r = PromptT ($ r)
