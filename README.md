@@ -211,8 +211,10 @@ This type is also similar in structure to `Bazaar`, from the *lens* package.
 However, `Bazaar` forces the "prompting effect" to take place in the same
 context as the `Traversable` `t`...which really defeats the purpose of this
 whole thing in the first place (the idea is to be able to separate your
-prompting effect from your application logic).  If you keep your logic
-parameterized over all `m`, then you can model `Prompt`, but not `PromptT`.
+prompting effect from your application logic).  You would be able to model
+something like `Prompt` and `runPrompt` if you keep all your `Bazaar`
+functions parameterized over all `m`, but even compared to `runPromptM`,
+`Bazaar` is too unconstrained.
 
 It's also somewhat similar to the `Client` type from *pipes*, but it's also
 a bit tricky to use that with a different effect type than the logic

@@ -76,7 +76,7 @@ hoistIsoP :: (forall s. t s -> u s)
 hoistIsoP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
 
 liftP :: Applicative t => t r -> PromptT a b t r
-liftP x = PromptT $ const (pure x)
+liftP x = PromptT $ const (return x)
 
 prompt :: a -> PromptT a b t b
 prompt r = PromptT ($ r)
