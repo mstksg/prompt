@@ -79,7 +79,7 @@ import Control.Monad.Trans
 import Control.Monad.Prompt
 import Text.Read
 
-promptFoo2 :: PromptT String String (Either Int) Foo
+promptFoo2 :: PromptT String String Maybe Foo
 promptFoo2 = do
     bar <- prompt "bar"
     x   <- prompt "baz"
