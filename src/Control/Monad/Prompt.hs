@@ -4,11 +4,28 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Control.Monad.Prompt where
+module Control.Monad.Prompt (
+    MonadPrompt(..)
+  , PromptT(..)
+  , Prompt
+  , runPromptM
+  , runPromptT
+  , runPrompt
+  , prompt'
+  , prompts'
+  , interactP
+  , interactPT
+  , mapPromptT
+  , hoistIsoP
+  , liftP
+  , promptP
+  , promptsP
+  ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Error.Class
+import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import Control.Monad.Trans
@@ -53,7 +70,7 @@ instance (MonadError e t, Traversable t) => MonadError e (PromptT a b t) where
 instance (MonadReader r t, Traversable t) => MonadReader r (PromptT a b t) where
     ask = lift ask
     reader = lift . reader
-    local = mapPrompt . local
+    local = mapPromptT . local
 
 instance (MonadState s t, Traversable t) => MonadState s (PromptT a b t) where
     get = lift get
@@ -63,11 +80,15 @@ instance (MonadState s t, Traversable t) => MonadState s (PromptT a b t) where
 instance (MonadWriter w t, Traversable t) => MonadWriter w (PromptT a b t) where
     writer = lift . writer
     tell = lift . tell
-    listen = mapPrompt listen
-    pass = mapPrompt pass
+    listen = mapPromptT listen
+    pass = mapPromptT pass
 
-mapPrompt :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
-mapPrompt f (PromptT p) = PromptT $ fmap f . p
+instance Applicative t => MonadPrompt a b (PromptT a b t) where
+    prompt = promptP
+    prompts = promptsP
+
+mapPromptT :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
+mapPromptT f (PromptT p) = PromptT $ fmap f . p
 
 hoistIsoP :: (forall s. t s -> u s)
           -> (forall s. u s -> t s)
@@ -78,8 +99,11 @@ hoistIsoP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
 liftP :: Applicative t => t r -> PromptT a b t r
 liftP x = PromptT $ const (return x)
 
-prompt :: a -> PromptT a b t b
-prompt r = PromptT ($ r)
+promptP :: a -> PromptT a b t b
+promptP r = PromptT ($ r)
+
+promptsP :: Functor t => (b -> c) -> a -> PromptT a b t c
+promptsP f r = PromptT $ (fmap . fmap) f . ($ r)
 
 runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
 runPromptM (PromptT p) f = runIdentity <$> p (fmap Identity . f)

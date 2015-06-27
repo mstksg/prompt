@@ -3,7 +3,7 @@
 
 name:                prompt
 version:             0.1.0.0
-synopsis:            Monad and transformer for deferred-effect pure
+synopsis:            Monad (and transformer) for deferred-effect pure
                      prompt-response queries
 -- description:         
 homepage:            https://github.com/mstksg/prompt
@@ -19,6 +19,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Control.Monad.Prompt
+                       Control.Monad.Prompt.Class
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.6 && <5
