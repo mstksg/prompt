@@ -136,6 +136,10 @@ For more advanced usage, there is a `MonadError` instance, so you can have
 `PromptT a b (Either e) r` with things like `throwError` and `catchError` to
 "catch" an error value and respond/recover.
 
+You can work over any `Traversable` `t`, so, for example, working under
+`Writer w` will let you log items as you receive or prompt them.  All without
+ever involving `IO`, etc.!
+
 Your "prompting effect" also has access to the underlying `Traversable` `t`,
 so you can mix and match sources of error from between your `Prompt` and also
 your prompt effect result.
