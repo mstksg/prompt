@@ -1,66 +1,83 @@
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Control.Monad.Query where
 
-import Control.Monad
 import Control.Applicative
-import Data.Traversable
+import Control.Monad
+import Control.Monad.Error.Class
+import Control.Monad.Reader.Class
+import Control.Monad.State.Class
 import Control.Monad.Trans
+import Control.Monad.Writer.Class
 import Data.Functor.Identity
 
-data QueryT a b m r = QPure r
-                    | QLift (m (QueryT a b m r))
-                    | QReq a (b -> QueryT a b m r)
+data QueryT a b t r = QueryT { runQueryTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
 
 type Query a b = QueryT a b Identity
 
-instance Functor m => Functor (QueryT a b m) where
-    fmap f (QPure x)  = QPure (f x)
-    fmap f (QLift mx) = QLift (fmap f <$> mx)
-    fmap f (QReq r g) = QReq r $ fmap f . g
+instance Functor t => Functor (QueryT a b t) where
+    fmap f (QueryT q) = QueryT $ (fmap . fmap) f . q
 
-instance Applicative m => Applicative (QueryT a b m) where
-    pure = QPure
-    QPure f <*> q  = fmap f q
-    QLift mf <*> q = case q of
-                       QPure x  -> QLift (fmap ($ x) <$> mf)
-                       QLift mx -> QLift (liftA2 (<*>) mf mx)   -- dangerous?
-                       QReq r g -> QReq r $ \s -> QLift $ fmap (<*> g s) mf -- dangerous?
-    QReq r g <*> q = QReq r $ \s -> g s <*> q
+instance Applicative t => Applicative (QueryT a b t) where
+    pure x = QueryT $ const (return (pure x))
+    QueryT f <*> QueryT x = QueryT $ \g -> liftA2 (<*>) (f g) (x g)
 
--- instance Alternative m => Alternative (QueryT a b m) where
---     empty   = QLift empty
---     QPure x  <|> _ = QPure x
---     QLift mx <|> y = QLift $ mx <|> pure y          -- what about case of QLift (pure (QLift empty)) ?
+instance Alternative t => Alternative (QueryT a b t) where
+    empty = QueryT $ const (return empty)
+    QueryT x <|> QueryT y = QueryT $ \g -> liftA2 (<|>) (x g) (y g)
 
-instance Monad m => Monad (QueryT a b m) where
-    return = QPure
-    QPure x >>= f  = f x
-    QLift mx >>= f = QLift $ fmap (>>= f) mx        -- dangerous?
-    QReq r g >>= f = QReq r $ \s -> case g s of
-                                      QPure x    -> f x
-                                      QLift mx   -> QLift $ fmap (>>= f) mx   -- dangerous?
-                                      QReq r' g' -> QReq r' (f <=< g')
+instance (Monad t, Traversable t) => Monad (QueryT a b t) where
+    return x = QueryT $ const (return (return x))
+    QueryT q >>= f = QueryT $ \g -> do
+        QueryT x <- traverse f <$> q g
+        join <$> x g
+
+instance (MonadPlus t, Traversable t) => MonadPlus (QueryT a b t) where
+    mzero = empty
+    mplus = (<|>)
 
 instance MonadTrans (QueryT a b) where
-    lift = QLift . fmap QPure
+    lift x = QueryT $ const (return x)
 
-query :: a -> QueryT a b m b
-query r = QReq r QPure
+instance (MonadError e t, Traversable t) => MonadError e (QueryT a b t) where
+    throwError = lift . throwError
+    catchError (QueryT q) f = QueryT $ \g -> do
+      x <- q g
+      let QueryT q' = sequence $ fmap return x `catchError` \e -> return (f e)
+      join <$> q' g
 
-runQueryTM :: (Traversable t, Monad t, Monad m) => (a -> m (t b)) -> QueryT a b t r -> m (t r)
-runQueryTM f q = case q of
-                   QPure x  -> return (return x)
-                   QLift mx -> fmap join . sequence . fmap (runQueryTM f) $ mx      -- better way?
-                   QReq r g -> fmap join . sequence . fmap (runQueryTM f . g) =<< f r
+instance (MonadReader r t, Traversable t) => MonadReader r (QueryT a b t) where
+    ask = lift ask
+    reader = lift . reader
+    local = hoistQ . local
 
-runQueryM :: Monad m => (a -> m b) -> Query a b r -> m r
-runQueryM f = fmap runIdentity . runQueryTM (fmap Identity . f)
+instance (MonadState s t, Traversable t) => MonadState s (QueryT a b t) where
+    get = lift get
+    put = lift . put
+    state = lift . state
 
-runQueryT :: Monad t => (a -> t b) -> QueryT a b t r -> t r
-runQueryT f q = case q of
-                  QPure x  -> return x
-                  QLift mx -> runQueryT f =<< mx
-                  QReq r g -> runQueryT f . g =<< f r
+instance (MonadWriter w t, Traversable t) => MonadWriter w (QueryT a b t) where
+    writer = lift . writer
+    tell = lift . tell
+    listen = hoistQ listen
+    pass = hoistQ pass
 
-runQuery :: (a -> b) -> Query a b r -> r
-runQuery f = runIdentity . runQueryT (Identity . f)
+hoistQ :: (t r -> t s) -> QueryT a b t r -> QueryT a b t s
+hoistQ f (QueryT q) = QueryT $ fmap f . q
+
+query :: Applicative t => a -> QueryT a b t b
+query r = QueryT ($ r)
+
+runQueryM :: Monad m => Query a b r -> (a -> m b) -> m r
+runQueryM (QueryT q) f = runIdentity <$> q (fmap Identity . f)
+
+runQueryT :: QueryT a b t r -> (a -> t b) -> t r
+runQueryT (QueryT q) f = runIdentity $ q (Identity . f)
+
+runQuery :: Query a b r -> (a -> b) -> r
+runQuery (QueryT q) f = runIdentity . runIdentity $ q (Identity . Identity . f)
 
