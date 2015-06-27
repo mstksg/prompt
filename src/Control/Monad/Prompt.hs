@@ -14,6 +14,7 @@ import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Functor.Identity
+import Control.Monad.Prompt.Class
 
 data PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
 
@@ -66,6 +67,9 @@ instance (MonadWriter w t, Traversable t) => MonadWriter w (PromptT a b t) where
     listen = mapPrompt listen
     pass = mapPrompt pass
 
+instance MonadPrompt a b (PromptT a b t) where
+    prompt = promptPromptT
+
 mapPrompt :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
 mapPrompt f (PromptT p) = PromptT $ fmap f . p
 
@@ -78,8 +82,8 @@ hoistIsoP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
 liftP :: Applicative t => t r -> PromptT a b t r
 liftP x = PromptT $ const (return x)
 
-prompt :: a -> PromptT a b t b
-prompt r = PromptT ($ r)
+promptPromptT :: a -> PromptT a b t b
+promptPromptT r = PromptT ($ r)
 
 runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
 runPromptM (PromptT p) f = runIdentity <$> p (fmap Identity . f)
