@@ -5,8 +5,26 @@ name:                prompt
 version:             0.1.0.0
 synopsis:            Monad (and transformer) for deferred-effect pure
                      prompt-response queries
--- description:         
+description:         Monad (and transformer) for delayed-effect "pure"
+                     prompt-and-response queries.
+                     .
+                     Allows you to specify programs that might query a
+                     database, talk to stdio, etc., without ever involving IO
+                     or opening the door to arbitrary IO.  Write a potentially
+                     pure computation describing prompting interactions, etc.,
+                     without having your type actually do any IO or involve
+                     itself with IO or any effectful context.
+                     .
+                     Useful as a source of "things from IO", without ever
+                     actually involving IO or arbitrary IO itself; only
+                     executing a specific subset of IO (or State, etc.) that
+                     you yourself, the caller, specifies explicitly.  Safer
+                     and more meaningful type.
+                     .
+                     For more information, see
+                     <https://github.com/mstksg/prompt the README>.
 homepage:            https://github.com/mstksg/prompt
+bug-reports:         https://github.com/mstksg/prompt/issues
 license:             MIT
 license-file:        LICENSE
 author:              Justin Le
@@ -14,7 +32,8 @@ maintainer:          justin@jle.im
 copyright:           (c) 2015 Justin Le
 category:            Control
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:  README.md
+                     CHANGELOG.md
 cabal-version:       >=1.10
 
 library
@@ -22,7 +41,7 @@ library
                        Control.Monad.Prompt.Class
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.6 && <5
+  build-depends:       base >=4.8 && <5
                      , mtl
                      , transformers
   hs-source-dirs:      src

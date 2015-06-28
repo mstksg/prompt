@@ -13,26 +13,49 @@
 -- Stability   : unstable
 -- Portability : portable
 --
+-- Provides the 'PromptT' type, which allows you to program computations
+-- that can "ask" or "prompt" with values to get values in return.  The
+-- computation doesn't care about the process of prompting, or how it
+-- works, and has nothing to do with the effectful monad where the
+-- prompting will eventually take place.
+--
+-- For example, sometimes you might want a computation to be able to query
+-- or database, or talk with stdio, but you don't want your type to involve
+-- arbitrary IO or be over IO, opening the door to a mess of IO.  'Prompt'
+-- lets you write programs that can query "something", and then at a later
+-- point in time, run it, providing the method of fulfilling each prompt.
+-- Write your program independent of IO, or databases, or stdio, etc.; only
+-- later "fill in" what it means.  You can even run the same 'Prompt' with
+-- different ways to fulfill the prompts --- pure, effectful, etc.
+--
+-- For usage examples and a more detailed explanation, see
+-- <https://github.com/mstksg/prompt the README>.
 
 module Control.Monad.Prompt (
-    MonadPrompt(..)
-  , PromptT(..)
+  -- * Prompt
+    PromptT
   , Prompt
+  , MonadPrompt(..)
+  , prompt'
+  , prompts'
+  -- * Running
   , runPromptTM
   , runPromptM
   , runPromptT
   , runPrompt
-  , prompt'
-  , prompts'
   , interactP
   , interactPT
-  , mapPromptT
-  , hoistP
-  , liftP
+  -- * Specialized
   , promptP
   , promptsP
   , promptP'
   , promptsP'
+  -- * Low level
+  , mapPromptT
+  , hoistP
+  , liftP
+  , mkPromptT
+  , mkPrompt
   ) where
 
 import Control.Applicative
@@ -65,11 +88,17 @@ import Data.Functor.Identity
 -- unrelated to the effectful monad where the prompting will eventually
 -- take place.
 --
-newtype PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
+-- Constructor is hidden, but a direct constructing function is exported as
+-- 'mkPrompT' if needed or wanted.
+--
+newtype PromptT a b t r = PromptT (forall m. Monad m => (a -> m (t b)) -> m (t r))
 
 -- | Provides the ability to "prompt" and "query", asking with an @a@ for
 -- a @b@.  A type synonym for 'PromptT' without any underlying
 -- 'Traversable'.
+--
+-- Can be "constructed directly" using 'mkPrompt', but typically using
+-- 'prompt' and the 'Applicative', 'Monad' instances etc. is better.
 type Prompt a b = PromptT a b Identity
 
 instance Functor t => Functor (PromptT a b t) where
@@ -123,6 +152,26 @@ instance Applicative t => MonadPrompt a b (PromptT a b t) where
     prompt = promptP
     prompts = promptsP
 
+-- | Directly construct a 'PromptT'.  Has to be able to take a @(a - m (t
+-- b)) -> m (t r)@ that can work on /any/ 'Monad'.
+--
+-- Typically this won't be used, but is provided for completion; using
+-- 'prompt' and its 'Applicative', 'Monad' instances, etc., is more clear.
+--
+-- @
+-- 'prompt' r = 'mkPromptT' $ \g -> g r
+-- @
+mkPromptT :: (forall m. Monad m => (a -> m (t b)) -> m (t r)) -> PromptT a b t r
+mkPromptT = PromptT
+
+-- | Directly construct a 'Prompt'.  Has to be able to take a @(a -> m b)
+-- -> m r@ that can work on /any/ 'Monad'.
+--
+-- Typically this won't be used, but is provided for completion; using
+-- 'prompt' and its 'Applicative', 'Monad' instances, etc., is more clear.
+mkPrompt :: (forall m. Monad m => (a -> m b) -> m r) -> Prompt a b r
+mkPrompt f = PromptT $ \g -> Identity <$> f (fmap runIdentity . g)
+
 -- | Maps the underying @t a@ returned by 'PromptT'.  Cannot change @t@.
 mapPromptT :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
 mapPromptT f (PromptT p) = PromptT $ fmap f . p
@@ -130,10 +179,10 @@ mapPromptT f (PromptT p) = PromptT $ fmap f . p
 -- | Swap out the 'Traversable' @t@ with a pair of natural transformations.
 -- The first maps the output @t a@, and the second maps the result of the
 -- prompting function.
-hoistP :: (forall s. t s -> u s)
-          -> (forall s. u s -> t s)
-          -> PromptT a b t r
-          -> PromptT a b u r
+hoistP :: (forall s. t s -> u s)    -- ^ forward natural transformation
+       -> (forall s. u s -> t s)    -- ^ backwards natural transformation
+       -> PromptT a b t r
+       -> PromptT a b u r
 hoistP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
 
 -- | Like 'lift', but without the 'Monad' constraint.
@@ -142,41 +191,76 @@ liftP x = PromptT $ const (return x)
 
 -- | Like 'prompt', but specialized to 'PromptT' and without
 -- a 'Applicative' constraint.
-promptP :: a -> PromptT a b t b
+promptP :: a                    -- ^ prompting value
+        -> PromptT a b t b
 promptP r = PromptT ($ r)
 
 -- | Like 'prompts', but specialized to 'PromptT' and downgrading the
 -- 'Applicative' constraint to a 'Functor' constraint.
-promptsP :: Functor t => (b -> c) -> a -> PromptT a b t c
+promptsP :: Functor t
+         => (b -> c)            -- ^ to be applied to response value
+         -> a                   -- ^ prompting value
+         -> PromptT a b t c
 promptsP f r = PromptT $ (fmap . fmap) f . ($ r)
 
 -- | Like 'prompt'', but specialized to 'PromptT' and without the
 -- 'Applicative' constraint.  Is a 'promptP' strict on its argument.
-promptP' :: a -> PromptT a b t b
+promptP' :: a                   -- ^ prompting value (strict)
+         -> PromptT a b t b
 promptP' x = x `seq` promptP x
 
 -- | Like 'prompts'', but specialized to 'PromptT' and downgrading the
 -- 'Applicative' constraint to a 'Functor' constraint.  Is a 'promptsP'
 -- strict on its argument.
-promptsP' :: Functor t => (b -> c) -> a -> PromptT a b t c
+promptsP' :: Functor t
+          => (b -> c)           -- ^ to be applied to response value
+          -> a                  -- ^ prompting value (strict)
+          -> PromptT a b t c
 promptsP' f x = x `seq` promptsP f x
 
--- | Run a @'Prompt' a b r@ with a given effectful @a -> m b@ function, to
--- get the resulting @r@ in @m@.  Note that the @Prompt@ itself in general
--- has nothing to do with @m@, and cannot execute arbitrary @m@ other than
--- that given in the prompt response function.
-runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
+-- | Run a @'PromptT' a b t r@ with a given effectful @a -> m (t b)@
+-- "prompt response" function, to get the resulting @r@ in @m@ and @t@.
+-- The "prompt response" function is able to interact with the underlying
+-- 'Traversable' @t@.
+--
+-- Note that the 'PromptT' in general has nothing to do with the @m@, and
+-- cannot execute arbitrary @m@ other than that given in the prompt
+-- response function.
+runPromptTM :: Monad m
+            => PromptT a b t r
+            -> (a -> m (t b))   -- ^ "Prompt response function",
+                                -- effectfully responding to a given @a@ with a @b@.
+            -> m (t r)
+runPromptTM (PromptT p) = p
+
+-- | Run a @'Prompt' a b r@ with a given effectful @a -> m b@ "prompt
+-- response" function, to get the resulting @r@ in @m@.  Note that the
+-- 'Prompt' itself in general has nothing to do with @m@, and cannot
+-- execute arbitrary @m@ other than that given in the prompt response
+-- function.
+runPromptM :: Monad m
+           => Prompt a b r
+           -> (a -> m b)   -- ^ "Prompt response function", effectfully
+                           -- responding to a given @a@ with a @b@.
+           -> m r
 runPromptM (PromptT p) f = runIdentity <$> p (fmap Identity . f)
 
 -- | Run a @'PromptT' a b t r@ with a given @a -> t b@ function, with
 -- 'Traversable' @t@.  The effects take place in the same context as the
 -- underlying context of the 'PromptT'.
-runPromptT :: PromptT a b t r -> (a -> t b) -> t r
+runPromptT :: PromptT a b t r
+           -> (a -> t b)    -- ^ "Prompt response function", "purely"
+                            -- responding to a given @a@ with a @b@ in
+                            -- context of 'Traversable' @t@.
+           -> t r
 runPromptT (PromptT p) f = runIdentity $ p (Identity . f)
 
 -- | Run a @'Prompt' a b r@ with a pure @a -> b@ prompt response function.
 -- More or less reduces @'Prompt' a b@ to a @'Reader' (a -> b)@.
-runPrompt :: Prompt a b r -> (a -> b) -> r
+runPrompt :: Prompt a b r
+          -> (a -> b)   -- ^ "Prompt response function", purely responding
+                        -- to a given @a@ with a @b@.
+          -> r
 runPrompt (PromptT p) f = runIdentity . runIdentity $ p (Identity . Identity . f)
 
 -- | Run a @'PromptT' String String@ in IO by sending the request to stdout

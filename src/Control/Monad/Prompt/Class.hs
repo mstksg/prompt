@@ -4,6 +4,32 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
+-- |
+-- Module      : Control.Monad.Prompt.Class
+-- Description : Typeclass for contexts with prompting ability.
+-- Copyright   : (c) Justin Le 2015
+-- License     : MIT
+-- Maintainer  : justin@jle.im
+-- Stability   : unstable
+-- Portability : portable
+--
+-- Provides a typeclass for 'Applicative' and 'Monad' types that give you
+-- the ability to, at any time, "prompt" with an @a@ and get a @b@ in
+-- response.  The power of this instance is that each type gets to define
+-- its own way to deliver a response.
+--
+-- This library provides instances for 'PromptT' from
+-- "Control.Monad.Prompt" and the monad transformers in /transformers/ and
+-- /mtl/.  Feel free to create your own instances too.
+--
+-- @
+-- data Interactive a = Interactive ((String -> String) -> a)
+--
+-- -- at any time, ask with a string to get a string
+-- instance MonadPrompt String String Interactive where
+--     prompt str = Interactive $ \f -> f str
+-- @
+
 module Control.Monad.Prompt.Class (
     MonadPrompt(..)
   , prompt'
@@ -21,16 +47,29 @@ import qualified Control.Monad.State.Strict  as SS
 import qualified Control.Monad.Writer.Lazy   as WL
 import qualified Control.Monad.Writer.Strict as WS
 
+-- | An 'Applicative' (and possibly 'Monad') where you can, at any time,
+-- "prompt" with an @a@ and receive a @b@ in response.
+--
+-- Instances include 'PromptT' and any /transformers/ monad transformer
+-- over another 'MonadPrompt'.
 class Applicative m => MonadPrompt a b m | m -> a b where
-    prompt  :: a -> m b
+    -- | "Prompt" with an @a@ for a @b@ in the context of the type.
+    prompt  :: a        -- ^ prompting value
+            -> m b
     prompt = prompts id
-    prompts :: (b -> c) -> a -> m c
+    -- | "Prompt" with an @a@ for a @b@ in the context of the type, and
+    -- apply the given function to receive a @c@.
+    prompts :: (b -> c) -- ^ mapping function
+            -> a        -- ^ prompting value
+            -> m c
     prompts f = fmap f . prompt
     {-# MINIMAL prompt | prompts #-}
 
+-- | A version of 'prompt' strict on its prompting value.
 prompt' :: MonadPrompt a b m => a -> m b
 prompt' x = x `seq` prompt x
 
+-- | A version of 'prompts' strict on its prompting value.
 prompts' :: MonadPrompt a b m => (b -> c) -> a -> m c
 prompts' f x = x `seq` prompts f x
 

@@ -15,6 +15,11 @@ queries or prompts to a user).  When we're writing our actual logic, we never
 involve anything with IO, State, etc., so we don't unleash a whole can of
 worms by using, for example, a monad transformer over `IO`.
 
+Don't let your computation/type do arbitrary IO.  If you see a 'Prompt', know
+that it won't do arbitrary IO --- it'll potentially only do the IO that you,
+the caller, explicitly allows --- or even do all of the prompting in a pure
+context without any effects!
+
 ~~~haskell
 import Control.Monad.Prompt
 
@@ -151,7 +156,10 @@ logEvens = do
 
 That gives you streaming logging, or streaming writing-to-a-database, etc.
 
-Note that `Prompt () r` is equivalent to `Reader r`.
+There's a bit of a downside to this method, because your "prompt response
+function" given can't access the overlying monadic context --- `runPromptM`
+and `putStrLn` there can't return a `State Int String`, only a `String`.  We
+address this in the next section.
 
 ### Typeclass
 
@@ -224,26 +232,14 @@ baz
 Foo "hello!" 8
 ~~~
 
-Here we used `promptFoo2` that was written polymorphically, and specialized it
-to `PromptT String String Maybe a`.  We can write it monomorphically too, as:
-
-~~~haskell
-promptFoo2 :: PromptT String String Maybe a
-promptFoo2 = do
-    bar <- prompt "bar"
-    x   <- prompt "baz"
-    lift $ readMaybe x
-~~~
-
-But I really think the polymorphic version (with `mzero` and `return`) looks
-nicer!  `Alternative`, `MonadPlus`, `MonadError`, `MonadWriter`, etc. are all
+`Alternative`, `MonadPlus`, `MonadError`, `MonadWriter`, etc. are all
 supported.  And you can specify your logic, etc;, and your prompting can
 involve IO.  But your logic doesn't ever involve `IO` at all!
 
-One big advanage of this way over the extra transformer is that your
-"prompting function" has access to the underlying `Traversable` `t` as well,
-so you can communicate with the underlying prompt using your "prompt response"
-function.
+However, the main advantage with this that lets you do things that a Monad
+Transformer can't is that your "prompting function" has access to the
+underlying `Traversable` `t` as well, so you can communicate with the
+underlying prompt using your "prompt response" function.
 
 Which leads to the big finale!
 
@@ -277,9 +273,9 @@ promptFoo3 = Foo <$> prompt "bar" <*> promptRead "baz"
 throughEnv :: IO (Either MyError Foo)
 throughEnv = runPromptTM parseFoo3 $ \k -> do
     env <- lookupEnv k
-    case env of
-      Nothing -> return . Left  $ MENotFound k
-      Just v  -> return . Right $ v
+    return $ case env of
+      Nothing -> Left (MENotFound k)
+      Just v  -> Right v
 
 throughStdIO :: IO (Either MyError Foo)
 throughStdIO = interactPT parseFoo3
@@ -299,6 +295,8 @@ throughMap m = runPromptT parseFoo3 $ \k ->
       Just v  -> Right v
 ~~~
 
+Note that for `throughEnv`, errors can come from both parsing errors and from
+the deferred "prompt response" lookup function!
 
 Comparisons
 -----------
