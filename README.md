@@ -309,16 +309,16 @@ It's also unrelated in this same manner to `Prompt` from the *MonadPrompt*
 package, and `Program` from *operational* too.
 
 This type is also similar in structure to `Bazaar`, from the *lens* package.
-However, `Bazaar` forces the "prompting effect" to take place in the same
-context as the `Traversable` `t`...which really defeats the purpose of this
-whole thing in the first place (the idea is to be able to separate your
-prompting effect from your application logic).  If the `Traversable` you want
-to transform has a "monad transformer" version, then you can somewhat simulate
-`PromptT` for that specifc `t` with the transformer version.  But the bigger
-fundamental problem is that `Bazaar` can't have a monad instance because it is
-RankN parameterized over `Applicative` only, and not `Monad`.  So you can't
-use it to do the monadic things described here, which may or may not be okay
-for your purposes.
+The biggest difference that makes `Bazaar` unusable is because the RankN
+constraint is only `Applicative`, not `Monad`, so a `Monad` instance is
+impossible.  Ignoring that (or if it's okay for you to only use the
+`Applicative` instance), `Bazaar` forces the "prompting effect" to take place
+in the same context as the `Traversable` `t`...which really defeats the
+purpose of this whole thing in the first place (the idea is to be able to
+separate your prompting effect from your application logic).  If the
+`Traversable` you want to transform has a "monad transformer" version, then
+you can somewhat simulate `PromptT` for that specifc `t` with the transformer
+version.
 
 It's also somewhat similar to the `Client` type from *pipes*, but it's also
 a bit tricky to use that with a different effect type than the logic
