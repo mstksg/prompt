@@ -73,18 +73,19 @@ worry that it will never produce arbitrary IO effects!  You can be certain
 that a `Prompt` will never call `launchMissiles`, like a `getFoo :: IO Foo`
 might!
 
-Where to use it
----------------
+As a pure underlying effect source
+----------------------------------
 
 Many libraries managing effects, like *pipes* and *conduit*, or
 DSL's/platforms that work with underlying effects, like *auto*, will work over
 an effectful monad like IO.  But sometimes, you don't need all of the power of
 arbitrary IO --- you don't want to manage the effects of arbitrary IO --- you
-just need one thing, like querying a database or talking to stdio.  Instead of
-working over `IO` the entire time, you can just decide to work with one
-prompting aspect.
+just need to manage the effects of one thing, like querying a database or
+talking to stdio.  Instead of working over `IO` the entire time, you can just
+decide to work with one prompting aspect.
 
-### With Transformers
+With Transformers
+-----------------
 
 `Prompt a b` can be used as monad to transform for any monad transformer to
 give an "interactive source" at the bottom of any monad transformer.
