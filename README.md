@@ -91,6 +91,34 @@ all!  All you added was an extra "promptable source".
 
 You can also use this to get short-circuiting behavior with `MaybeT`, etc.
 
+~~~haskell
+import Control.Monad.Trans
+import Control.Monad.Prompt
+import Text.Read
+
+promptFoo2 :: MaybeT (Prompt String String) Foo
+promptFoo2 = do
+    bar <- lift $ prompt "bar"
+    x   <- lift $ prompt "baz"
+    case readMaybe x of
+      Just baz -> return baz
+      Nothing  -> mzero
+~~~
+
+~~~haskell
+ghci> runPromptM (runMaybeT promptFoo2) getEnv
+Nothing
+ghci> runPromptM (runMaybeT (promptFoo2 <|> return (Foo "error" 0))) getEnv
+Just (Foo "error" 0)
+ghci> setEnv "baz" "19"
+ghci> runPromptM (runMaybeT (promptFoo2 <|> return (Foo "error" 0))) getEnv
+Just (Foo "hello!" 19)
+~~~
+
+This becomes pretty nice with `ExceptT` or any instance of `MonadError`, where
+you can use `throwError`, `catchError`, etc., to have actual data with your
+errors.
+
 You can also play with using for the return type.  For example:
 
 ~~~haskell
@@ -121,13 +149,36 @@ code polymorphic over all things that can be "prompted".  For example, the
 above example can be written as:
 
 ~~~haskell
-logEvens :: (MonadState Int m, MonadPrompt String () m) => m ()
-logEvens = do
-    modify (+1)
-    x <- get
-    when (even x) $ prompt (show x)
+promptFoo2 :: (MonadPlus m, MonadPrompt String String m) => m Foo
+promptFoo2 = do
+    bar <- prompt "bar"
+    x   <- prompt "baz"
+    case readMaybe x of
+      Just baz -> return baz
+      Nothing  -> mzero
+
+promptFoo :: (MonadPrompt String String m) => m Foo
+promptFoo = Foo <$> prompt "bar" <*> (length <$> prompt "baz")
 ~~~
 
+~~~haskell
+ghci> interactP . runMaybeT $ promptFoo2 <|> promptFoo
+bar
+> hello!
+baz
+> 19
+Foo "hello!" 19
+ghci> interactP . runMaybeT $ promptFoo2 <|> promptFoo
+bar
+> hello!
+baz
+> i am baz
+bar         -- failure to parse, so retry with `promptFoo`
+> hello!
+baz
+> i am baz
+Foo "hello!" 8
+~~~
 
 PromptT
 -------
@@ -137,73 +188,53 @@ context of `Traversable` `t`, so you can do things like short-circuiting with
 `Either e` or `Maybe`, or multiple branches for `[]`, etc --- all "purely",
 without worrying about the eventual effects like IO.
 
-~~~haskell
-import Control.Monad.Trans
-import Control.Monad.Prompt
-import Text.Read
+In some ways, this is a bit redundant, because `ParserT a b Maybe` is somewhat
+equivalent to `MaybeT (Parser a b)`.  However, using `ParserT` can be more
+convenient because you can use arbitrary Traversables, and also there are
+functions given to make this work "out of the box", instead of manually
+unwrapping with `runMaybeT`, `runExceptT`, etc.
 
-promptFoo2 :: PromptT String String Maybe Foo
+~~~haskell
+ghci> interactPT $ promptFoo2 <|> promptFoo
+bar
+> hello!
+baz
+> 19
+Foo "hello!" 19
+ghci> interactPT $ promptFoo2 <|> promptFoo
+bar
+> hello!
+baz
+> i am baz
+bar         -- failure to parse, so retry with `promptFoo`
+> hello!
+baz
+> i am baz
+Foo "hello!" 8
+~~~
+
+Here we used `promptFoo2` that was written polymorphically, and specialized it
+to `PromptT String String Maybe a`.  We can write it monomorphically too, as:
+
+~~~haskell
+promptFoo2 :: PromptT String String Maybe a
 promptFoo2 = do
     bar <- prompt "bar"
     x   <- prompt "baz"
-    case readMaybe x of
-      Just baz -> return baz
-      Nothing  -> mzero
-    -- also is `lift (readMaybe x)`
+    lift $ readMaybe x
 ~~~
 
-So now we have the ability to add pure short-circuiting.
+But I really think the polymorphic version (with `mzero` and `return`) looks
+nicer!  `Alternative`, `MonadPlus`, `MonadError`, `MonadWriter`, etc. are all
+supported.  And you can specify your logic, etc;, and your prompting can
+involve IO.  But your logic doesn't ever involve `IO` at all!
 
-~~~haskell
-ghci> :t runPromptTM
-runPromptTM :: Monad m => PromptT a b t r -> (a -> m (t b)) -> m (t r)
-ghci> runPromptTM promptFoo2 (fmap Just . getEnv)
-Nothing
-ghci> runPromptTM (promptFoo2 <|> return (Foo "error" 0)) (fmap Just . getEnv)
-Just (Foo "error" 0)
-ghci> setEnv "baz" "19"
-ghci> runPromptTM promptFoo2 (fmap Just . getEnv)
-Just (Foo "hello!" 19)
-~~~
+One big advanage of this way over the extra transformer is that your
+"prompting function" has access to the underlying `Traversable` `t` as well,
+so you can communicate with the underlying prompt using your "prompt response"
+function.
 
-~~~haskell
-ghci> runPromptTM (promptFoo2 <|> promptFoo) $ \prmpt -> putStrLn prmpt; Just <$> getLine
-bar         -- stdout prompt
-> hello!    -- stdin response typed in
-baz         -- stdout prompt
-> 19        -- stdin response typed in
-Just (Foo "hello!" 19)  -- result
-ghci> interactPT $ promptFoo2 <|> promptFoo     -- the same thing, using `interactPT`
-bar         -- stdout prompt
-> hello!    -- stdin response typed in
-baz         -- stdout prompt
-> world!    -- stdin response typed in
-bar         -- stdout prompt, trying promptFoo, because the first time failed
-> hello!    -- stdin response typed in
-baz         -- stdout prompt
-> i am baz  -- stdin response typed in
-Just (Foo "hello!" 8)  -- result
-~~~
-
-Now, you can program in a short-circuiting context, etc., and not ever open
-the door to arbitrary `IO` like a `MaybeT IO a` would!
-
-If `t` has a monad transformer version, then `PromptT a b (t Identity) r` is
-more or less equivalent to `t (Prompt a b) r` --- so the above examples are
-equivalent to `MaybeT (Prompt a b) r`.  So the transforming part is a bit
-redundant...but it can make some code more concise if used properly.
-
-For more advanced usage, there is a `MonadError` instance, so you can have
-`PromptT a b (Either e) r` with things like `throwError` and `catchError` to
-"catch" an error value and respond/recover.
-
-You can work over any `Traversable` `t`, so, for example, working under
-`Writer w` will let you log items as you receive or prompt them.  All without
-ever involving `IO`, etc.!
-
-Your "prompting effect" also has access to the underlying `Traversable` `t`,
-so you can mix and match sources of error from between your `Prompt` and also
-your prompt effect result.
+Which leads to the big finale!
 
 ~~~haskell
 import Control.Monad.Error.Class
@@ -218,14 +249,18 @@ data MyError = MENoParse Key Val
              | MENotFound Key
              deriving Show
 
-promptRead :: Key -> PromptT Key Val (Either MyError) b
+promptRead :: (MonadError MyError m, MonadPrompt Key Val m, Read b)
+           => Key -> m b
+-- promptRead :: Read b => Key -> PromptT Key Val (Either MyError) b
+-- promptRead :: Read b => Key -> ExceptT MyError (Prompt Key Val) b
 promptRead k = do
     resp <- prompt k
     case readMaybe resp of
       Nothing -> throwError $ MEParse k resp
       Just v  -> return v
 
-promptFoo3 :: PromptT Key Val (Either MyError) b
+promptFoo3 :: MonadPrompt Key Val m => m Foo
+-- promptFoo3 :: PromptT Key Val m Foo
 promptFoo3 = Foo <$> prompt "bar" <*> promptRead "baz"
 
 throughEnv :: IO (Either MyError Foo)
@@ -252,6 +287,7 @@ throughMap m = runPromptT parseFoo3 $ \k ->
       Nothing -> Left (MENotFound k)
       Just v  -> Right v
 ~~~
+
 
 Comparisons
 -----------

@@ -32,7 +32,7 @@ import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Functor.Identity
 
-data PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
+newtype PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
 
 type Prompt a b = PromptT a b Identity
 

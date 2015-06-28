@@ -13,11 +13,12 @@ module Control.Monad.Prompt.Class (
 import Control.Monad.Error
 import Control.Monad.Except
 import Control.Monad.Reader
-import qualified Control.Monad.RWS.Lazy as RWSL
-import qualified Control.Monad.RWS.Strict as RWSS
-import qualified Control.Monad.State.Lazy as SL
-import qualified Control.Monad.State.Strict as SS
-import qualified Control.Monad.Writer.Lazy as WL
+import Control.Monad.Trans.Maybe
+import qualified Control.Monad.RWS.Lazy      as RWSL
+import qualified Control.Monad.RWS.Strict    as RWSS
+import qualified Control.Monad.State.Lazy    as SL
+import qualified Control.Monad.State.Strict  as SS
+import qualified Control.Monad.Writer.Lazy   as WL
 import qualified Control.Monad.Writer.Strict as WS
 
 class Applicative m => MonadPrompt a b m | m -> a b where
@@ -66,5 +67,9 @@ instance (Monad m, MonadPrompt a b m, Monoid w) => MonadPrompt a b (RWSS.RWST r 
     prompts f = lift . prompts f
 
 instance (Monad m, MonadPrompt a b m, Monoid w) => MonadPrompt a b (RWSL.RWST r w s m) where
+    prompt    = lift . prompt
+    prompts f = lift . prompts f
+
+instance (Monad m, MonadPrompt a b m) => MonadPrompt a b (MaybeT m) where
     prompt    = lift . prompt
     prompts f = lift . prompts f

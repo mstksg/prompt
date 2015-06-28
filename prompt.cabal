@@ -24,6 +24,7 @@ library
   -- other-extensions:    
   build-depends:       base >=4.6 && <5
                      , mtl
+                     , transformers
   hs-source-dirs:      src
   ghc-options:         -Wall
   default-language:    Haskell2010
