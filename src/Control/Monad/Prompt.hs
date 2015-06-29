@@ -33,19 +33,20 @@
 
 module Control.Monad.Prompt (
   -- * Prompt
-    PromptT
-  , Prompt
+    Prompt
+  , runPromptM
+  , runPrompt
+  , interactP
+  -- * PromptT
+  , PromptT
+  , runPromptTM
+  , runPromptT
+  , interactPT
+  -- * Prompting
   , MonadPrompt(..)
   , prompt'
   , prompts'
-  -- * Running
-  , runPromptTM
-  , runPromptM
-  , runPromptT
-  , runPrompt
-  , interactP
-  , interactPT
-  -- * Specialized
+  -- ** Specialized
   , promptP
   , promptsP
   , promptP'
@@ -68,37 +69,47 @@ import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Functor.Identity
 
--- | Prompt type, providing the ability to "prompt" or "query" by
--- presenting/asking with an @a@ and receiving a @b@ response.
+-- | Like 'Prompt', but can perform its "pure" computations in the context
+-- of a 'Traversable' @t@, to absorb short-circuiting behvaior with 'Maybe'
+-- or 'Either', logging with 'Writer', etc., but this is in general
+-- completely unrelated to the effectful monad where the prompting will
+-- eventually take place.  Specify short-circuiting and logging logic,
+-- without worrying about IO or anything relating to the prompting effect.
 --
 -- @
 -- 'prompt' :: a -> (PromptT a b t) b
 -- @
 --
--- "Ask with an @a@, get a @b@."
---
--- Note that we defer the process of specifying /how/ 'prompt' delivers its
--- @b@.  It can take place in IO, or in any other effectful setting...but
--- 'PromptT' doesn't care, and it never involves IO or any arbitrary IO
--- itself.
---
--- 'PromptT' can perform its "pure" computations in the context of
--- a 'Traversable' @t@, to absorb short-circuiting behvaior with 'Maybe' or
--- 'Either', logging with 'Writer', etc., but this is in general completely
--- unrelated to the effectful monad where the prompting will eventually
--- take place.
+-- Implements several useful typeclasses for working with the underlying
+-- 'Traversable' and integrating effects, like 'Alternative', 'MonadError',
+-- 'MonadWriter', etc.
 --
 -- Constructor is hidden, but a direct constructing function is exported as
--- 'mkPrompT' if needed or wanted.
+-- 'mkPrompT' in the rare case it is needed or wanted.
 --
 newtype PromptT a b t r = PromptT (forall m. Monad m => (a -> m (t b)) -> m (t r))
 
--- | Provides the ability to "prompt" and "query", asking with an @a@ for
--- a @b@.  A type synonym for 'PromptT' without any underlying
--- 'Traversable'.
+-- | Prompt type, providing the ability to "prompt" or "query" by
+-- presenting/asking with an @a@ and receiving a @b@ response.
+--
+-- @
+-- 'prompt' :: a -> (Prompt a b) b
+-- @
+--
+-- "Ask with an @a@, get a @b@."
+--
+-- Has a 'Monad', 'Applicative', 'Functor', etc. instance so it can be
+-- sequenced monadically or applicatively, so you can sequence and bind
+-- from 'prompt'.
+--
+-- Note that we defer the process of specifying /how/ 'prompt' delivers its
+-- @b@.  It can take place in IO, or in any other effectful setting...but
+-- 'Prompt' doesn't care, and it never involves IO or any arbitrary IO
+-- itself.
 --
 -- Can be "constructed directly" using 'mkPrompt', but typically using
 -- 'prompt' and the 'Applicative', 'Monad' instances etc. is better.
+--
 type Prompt a b = PromptT a b Identity
 
 instance Functor t => Functor (PromptT a b t) where
@@ -190,7 +201,7 @@ liftP :: t r -> PromptT a b t r
 liftP x = PromptT $ const (return x)
 
 -- | Like 'prompt', but specialized to 'PromptT' and without
--- a 'Applicative' constraint.
+-- the 'Applicative' constraint.
 promptP :: a                    -- ^ prompting value
         -> PromptT a b t b
 promptP r = PromptT ($ r)

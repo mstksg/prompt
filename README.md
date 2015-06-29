@@ -15,7 +15,7 @@ queries or prompts to a user).  When we're writing our actual logic, we never
 involve anything with IO, State, etc., so we don't unleash a whole can of
 worms by using, for example, a monad transformer over `IO`.
 
-Don't let your computation/type do arbitrary IO.  If you see a 'Prompt', know
+Don't let your computation/type do arbitrary IO.  If you see a `Prompt`, know
 that it won't do arbitrary IO --- it'll potentially only do the IO that you,
 the caller, explicitly allows --- or even do all of the prompting in a pure
 context without any effects!
@@ -28,7 +28,7 @@ data Foo = Foo { fooBar :: String
                } deriving Show
 
 promptFoo :: Prompt String String Foo
-promptFoo = Foo <$> prompt "bar" <*> (length <$> prompt "baz")
+promptFoo = Foo <$> prompt "bar" <*> fmap length (prompt "baz")
 ~~~
 
 Here we build a `Foo` from a context where we can ask with strings and get
@@ -39,7 +39,7 @@ Let's build a `Foo` from stdin/stdout:
 ~~~haskell
 ghci> :t runPromptM
 runPromptM :: Monad m => Prompt a b r -> (a -> m b) -> m r
-ghci> runPromptM promptFoo $ \prmpt -> do putStrLn prmpt; getLine
+ghci> runPromptM promptFoo $ \str -> do putStrLn str; getLine
 bar         -- stdout prompt
 > hello!    -- stdin response typed in
 baz         -- stdout prompt
@@ -78,7 +78,20 @@ worry that it will never produce arbitrary IO effects!  You can be certain
 that a `Prompt` will never call `launchMissiles`, like a `getFoo :: IO Foo`
 might!
 
-As a pure underlying effect source
+You can also do some cute tricks; `Prompt a () r` with a "prompt response
+function" like `putStrLn` lets you do streaming logging, and defer *how* the
+logging is done --- to IO, to a list?
+
+~~~haskell
+ghci> let logHelloWord = mapM_ prompt ["hello", "world"]
+ghci> runPromptM logHelloWorld putStrLn
+hello
+world
+ghci> execWriter $ runPromptM logHelloWorld tell
+"helloworld"
+~~~
+
+As a "pure" underlying effect source
 ----------------------------------
 
 Many libraries managing effects, like *pipes* and *conduit*, or
@@ -117,7 +130,7 @@ promptFoo2 = do
     bar <- lift $ prompt "bar"
     x   <- lift $ prompt "baz"
     case readMaybe x of
-      Just baz -> return baz
+      Just baz -> return $ Foo bar baz
       Nothing  -> mzero
 ~~~
 
@@ -176,8 +189,8 @@ promptFoo2 = do
       Just baz -> return baz
       Nothing  -> mzero
 
-promptFoo :: (MonadPrompt String String m) => m Foo
-promptFoo = Foo <$> prompt "bar" <*> (length <$> prompt "baz")
+promptFoo :: MonadPrompt String String m => m Foo
+promptFoo = Foo <$> prompt "bar" <*> fmap length (prompt "baz")
 ~~~
 
 ~~~haskell
@@ -232,6 +245,13 @@ baz
 Foo "hello!" 8
 ~~~
 
+Or, like the example above,
+
+~~~haskell
+ghci> runPromptT logHelloWorld tell
+"helloworld"
+~~~
+
 `Alternative`, `MonadPlus`, `MonadError`, `MonadWriter`, etc. are all
 supported.  And you can specify your logic, etc;, and your prompting can
 involve IO.  But your logic doesn't ever involve `IO` at all!
@@ -241,7 +261,7 @@ Transformer can't is that your "prompting function" has access to the
 underlying `Traversable` `t` as well, so you can communicate with the
 underlying prompt using your "prompt response" function.
 
-Which leads to the big finale!
+Which leads to the big finale --- environment variable loading!
 
 ~~~haskell
 import Control.Monad.Error.Class
@@ -270,6 +290,10 @@ promptFoo3 :: MonadPrompt Key Val m => m Foo
 -- promptFoo3 :: Applicative t => PromptT Key Val t Foo
 promptFoo3 = Foo <$> prompt "bar" <*> promptRead "baz"
 
+--
+-- running!
+
+-- Lookup environment variables, and "throw" an error if not found
 throughEnv :: IO (Either MyError Foo)
 throughEnv = runPromptTM parseFoo3 $ \k -> do
     env <- lookupEnv k
@@ -277,17 +301,20 @@ throughEnv = runPromptTM parseFoo3 $ \k -> do
       Nothing -> Left (MENotFound k)
       Just v  -> Right v
 
+-- Fulfill the prompt through user input
 throughStdIO :: IO (Either MyError Foo)
 throughStdIO = interactPT parseFoo3
 
+-- Fulfill the prompt through user input; count blank responses as "not found"
 throughStdIOBlankIsError :: IO (Either MyError Foo)
 throughStdIOBlankIsError = runPromptTM parseFoo3 $ \k -> do
     putStrLn k
     resp <- getLine
-    if null resp
-      then return . Left  $ MENotFound k
-      else return . Right $ resp
+    return $ if null resp
+      then Left (MENotFound k)
+      else Right resp
 
+-- Fulfill the prompt purely through a Map lookup
 throughMap :: M.Map Key Val -> Either MyError Foo
 throughMap m = runPromptT parseFoo3 $ \k ->
     case M.lookup k m of
@@ -304,7 +331,7 @@ Comparisons
 To lay it all on the floor,
 
 ~~~haskell
-data PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
+newtype PromptT a b t r = PromptT { runPromptTM :: forall m. Monad m => (a -> m (t b)) -> m (t r) }
 ~~~
 
 There is admittedly a popular misconception that I've seen going around that
@@ -316,6 +343,11 @@ really mean much :)
 
 It's also unrelated in this same manner to `Prompt` from the *MonadPrompt*
 package, and `Program` from *operational* too.
+
+One close relative to this type is `forall m. ReaderT (a -> m b) m r`, where
+`prompt k = ReaderT ($ k)`.  This is more or less equivalent to `Prompt`, but
+still can't do the things that `PromptT` can do without a special instance of
+Monad.
 
 This type is also similar in structure to `Bazaar`, from the *lens* package.
 The biggest difference that makes `Bazaar` unusable is because the RankN
@@ -329,10 +361,15 @@ separate your prompting effect from your application logic).  If the
 you can somewhat simulate `PromptT` for that specifc `t` with the transformer
 version.
 
-It's also somewhat similar to the `Client` type from *pipes*, but it's also
-a bit tricky to use that with a different effect type than the logic
-`Traversable`, as well...so it has the same difference as `Bazaar` here.
+It's also somewhat similar to the `Client` type from *pipes*, but it's also a
+bit tricky to use that with a different effect type than the logic
+`Traversable`, as well...so it has a lot of the same difference as `Bazaar`
+here.
 
 But this type is common/simple enough that I'm sure someone has it somewhere
 in a library that I haven't been able to find.  If you find it, let me know!
 
+Copyright
+---------
+
+Copyright 2015 Justin Le
