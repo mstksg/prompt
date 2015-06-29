@@ -21,8 +21,9 @@ description:         Monad (and transformer) for delayed-effect "pure"
                      you yourself, the caller, specifies explicitly.  Safer
                      and more meaningful type.
                      .
-                     For more information, see
-                     <https://github.com/mstksg/prompt the README>.
+                     For more information and instructions on usage with
+                     examples, see <https://github.com/mstksg/prompt the
+                     README>.
 homepage:            https://github.com/mstksg/prompt
 bug-reports:         https://github.com/mstksg/prompt/issues
 license:             MIT
@@ -35,6 +36,11 @@ build-type:          Simple
 extra-source-files:  README.md
                      CHANGELOG.md
 cabal-version:       >=1.10
+
+source-repository head
+  type:              git
+  location:          git://github.com/mstksg/prompt.git
+
 
 library
   exposed-modules:     Control.Monad.Prompt
