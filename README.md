@@ -3,6 +3,15 @@ prompt
 
 Monad (and transformer) for delayed-effect "pure" prompt-and-respose queries.
 
+~~~bash
+$ cabal update
+$ cabal install prompt
+~~~
+
+Now on [hackage][]!
+
+[hackage]: http://hackage.haskell.org/package/prompt
+
 Prompt
 ------
 
