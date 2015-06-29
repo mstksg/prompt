@@ -1,6 +1,7 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
@@ -36,16 +37,22 @@ module Control.Monad.Prompt.Class (
   , prompts'
   ) where
 
-import Control.Monad.Error
-import Control.Monad.Except
-import Control.Monad.Reader
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Error
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import qualified Control.Monad.RWS.Lazy      as RWSL
-import qualified Control.Monad.RWS.Strict    as RWSS
-import qualified Control.Monad.State.Lazy    as SL
-import qualified Control.Monad.State.Strict  as SS
-import qualified Control.Monad.Writer.Lazy   as WL
-import qualified Control.Monad.Writer.Strict as WS
+import Control.Monad.Trans.Reader
+import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
+import qualified Control.Monad.Trans.RWS.Strict    as RWSS
+import qualified Control.Monad.Trans.State.Lazy    as SL
+import qualified Control.Monad.Trans.State.Strict  as SS
+import qualified Control.Monad.Trans.Writer.Lazy   as WL
+import qualified Control.Monad.Trans.Writer.Strict as WS
+
+#if !MIN_VERSION_base(4,8,0)
+import Control.Applicative
+import Data.Monoid
+#endif
 
 -- | An 'Applicative' (and possibly 'Monad') where you can, at any time,
 -- "prompt" with an @a@ and receive a @b@ in response.
@@ -63,7 +70,9 @@ class Applicative m => MonadPrompt a b m | m -> a b where
             -> a        -- ^ prompting value
             -> m c
     prompts f = fmap f . prompt
+#if MIN_VERSION_base(4,7,0)
     {-# MINIMAL prompt | prompts #-}
+#endif
 
 -- | A version of 'prompt' strict on its prompting value.
 prompt' :: MonadPrompt a b m => a -> m b

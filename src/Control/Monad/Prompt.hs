@@ -1,8 +1,9 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- |
 -- Module      : Control.Monad.Prompt
@@ -60,7 +61,7 @@ module Control.Monad.Prompt (
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad hiding (sequence, mapM)
 import Control.Monad.Error.Class
 import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
@@ -68,6 +69,12 @@ import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Functor.Identity
+
+#if !MIN_VERSION_base(4,8,0)
+import Data.Traversable
+import Prelude hiding (sequence, mapM)
+#endif
+
 
 -- | Like 'Prompt', but can perform its "pure" computations in the context
 -- of a 'Traversable' @t@, to absorb short-circuiting behvaior with 'Maybe'
@@ -113,25 +120,47 @@ newtype PromptT a b t r = PromptT (forall m. Monad m => (a -> m (t b)) -> m (t r
 type Prompt a b = PromptT a b Identity
 
 instance Functor t => Functor (PromptT a b t) where
+#if MIN_VERSION_base(4,8,0)
     fmap f (PromptT p) = PromptT $ (fmap . fmap) f . p
+#else
+    fmap f (PromptT p) = PromptT $ (liftM . fmap) f . p
+#endif
 
 instance Applicative t => Applicative (PromptT a b t) where
     pure x = PromptT $ const (return (pure x))
+#if MIN_VERSION_base(4,8,0)
     PromptT f <*> PromptT x = PromptT $ \g -> liftA2 (<*>) (f g) (x g)
+#else
+    PromptT f <*> PromptT x = PromptT $ \g -> liftM2 (<*>) (f g) (x g)
+#endif
 
 instance Alternative t => Alternative (PromptT a b t) where
     empty = PromptT $ const (return empty)
+#if MIN_VERSION_base(4,8,0)
     PromptT x <|> PromptT y = PromptT $ \g -> liftA2 (<|>) (x g) (y g)
+#else
+    PromptT x <|> PromptT y = PromptT $ \g -> liftM2 (<|>) (x g) (y g)
+#endif
 
 instance (Monad t, Traversable t) => Monad (PromptT a b t) where
     return x = PromptT $ const (return (return x))
     PromptT p >>= f = PromptT $ \g -> do
+#if MIN_VERSION_base(4,8,0)
         PromptT x <- traverse f <$> p g
         join <$> x g
+#else
+        PromptT x <- mapM f `liftM` p g
+        join `liftM` x g
+#endif
 
 instance (MonadPlus t, Traversable t) => MonadPlus (PromptT a b t) where
+#if MIN_VERSION_base(4,8,0)
     mzero = empty
     mplus = (<|>)
+#else
+    mzero = PromptT $ const (return mzero)
+    mplus (PromptT x) (PromptT y) = PromptT $ \g -> liftM2 mplus (x g) (y g)
+#endif
 
 instance MonadTrans (PromptT a b) where
     lift x = PromptT $ const (return x)
@@ -141,7 +170,11 @@ instance (MonadError e t, Traversable t) => MonadError e (PromptT a b t) where
     catchError (PromptT p) f = PromptT $ \g -> do
       x <- p g
       let PromptT p' = sequence $ fmap return x `catchError` \e -> return (f e)
+#if MIN_VERSION_base(4,8,0)
       join <$> p' g
+#else
+      join `liftM` p' g
+#endif
 
 instance (MonadReader r t, Traversable t) => MonadReader r (PromptT a b t) where
     ask = lift ask
@@ -181,11 +214,19 @@ mkPromptT = PromptT
 -- Typically this won't be used, but is provided for completion; using
 -- 'prompt' and its 'Applicative', 'Monad' instances, etc., is more clear.
 mkPrompt :: (forall m. Monad m => (a -> m b) -> m r) -> Prompt a b r
+#if MIN_VERSION_base(4,8,0)
 mkPrompt f = PromptT $ \g -> Identity <$> f (fmap runIdentity . g)
+#else
+mkPrompt f = PromptT $ \g -> Identity `liftM` f (liftM runIdentity . g)
+#endif
 
 -- | Maps the underying @t a@ returned by 'PromptT'.  Cannot change @t@.
 mapPromptT :: (t r -> t s) -> PromptT a b t r -> PromptT a b t s
+#if MIN_VERSION_base(4,8,0)
 mapPromptT f (PromptT p) = PromptT $ fmap f . p
+#else
+mapPromptT f (PromptT p) = PromptT $ liftM f . p
+#endif
 
 -- | Swap out the 'Traversable' @t@ with a pair of natural transformations.
 -- The first maps the output @t a@, and the second maps the result of the
@@ -194,7 +235,11 @@ hoistP :: (forall s. t s -> u s)    -- ^ forward natural transformation
        -> (forall s. u s -> t s)    -- ^ backwards natural transformation
        -> PromptT a b t r
        -> PromptT a b u r
+#if MIN_VERSION_base(4,8,0)
 hoistP to from (PromptT p) = PromptT $ \g -> to <$> p (fmap from . g)
+#else
+hoistP to from (PromptT p) = PromptT $ \g -> to `liftM` p (liftM from . g)
+#endif
 
 -- | Like 'lift', but without the 'Monad' constraint.
 liftP :: t r -> PromptT a b t r
@@ -212,7 +257,11 @@ promptsP :: Functor t
          => (b -> c)            -- ^ to be applied to response value
          -> a                   -- ^ prompting value
          -> PromptT a b t c
+#if MIN_VERSION_base(4,8,0)
 promptsP f r = PromptT $ (fmap . fmap) f . ($ r)
+#else
+promptsP f r = PromptT $ (liftM . fmap) f . ($ r)
+#endif
 
 -- | Like 'prompt'', but specialized to 'PromptT' and without the
 -- 'Applicative' constraint.  Is a 'promptP' strict on its argument.
@@ -254,7 +303,11 @@ runPromptM :: Monad m
            -> (a -> m b)   -- ^ "Prompt response function", effectfully
                            -- responding to a given @a@ with a @b@.
            -> m r
+#if MIN_VERSION_base(4,8,0)
 runPromptM (PromptT p) f = runIdentity <$> p (fmap Identity . f)
+#else
+runPromptM (PromptT p) f = runIdentity `liftM` p (liftM Identity . f)
+#endif
 
 -- | Run a @'PromptT' a b t r@ with a given @a -> t b@ function, with
 -- 'Traversable' @t@.  The effects take place in the same context as the
