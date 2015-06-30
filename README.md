@@ -1,7 +1,8 @@
 prompt
 ======
 
-Monad (and transformer) for delayed-effect "pure" prompt-and-respose queries.
+Lightweight library providing a monad/applicative (and transformer) for
+delayed-effect "pure" prompt-and-respose queries.
 
 ~~~bash
 $ cabal update
