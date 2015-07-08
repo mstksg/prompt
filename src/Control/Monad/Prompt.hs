@@ -61,13 +61,14 @@ module Control.Monad.Prompt (
   ) where
 
 import Control.Applicative
-import Control.Monad hiding (sequence, mapM)
+import Control.Monad hiding       (sequence, mapM, msum)
 import Control.Monad.Error.Class
 import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Writer.Class
+import Data.Foldable
 import Data.Functor.Identity
 
 #if !MIN_VERSION_base(4,8,0)
@@ -134,12 +135,17 @@ instance Applicative t => Applicative (PromptT a b t) where
     PromptT f <*> PromptT x = PromptT $ \g -> liftM2 (<*>) (f g) (x g)
 #endif
 
-instance Alternative t => Alternative (PromptT a b t) where
+instance (Alternative t, Traversable t) => Alternative (PromptT a b t) where
     empty = PromptT $ const (return empty)
+    PromptT x <|> PromptT y = PromptT $ \g -> do
+        x' <- x g
+        let c = (return . pure <$> x') <|> pure (y g)
 #if MIN_VERSION_base(4,8,0)
-    PromptT x <|> PromptT y = PromptT $ \g -> liftA2 (<|>) (x g) (y g)
+        -- TODO: Is this okay?????
+        -- join <$> sequence c
+        asum <$> sequence c
 #else
-    PromptT x <|> PromptT y = PromptT $ \g -> liftM2 (<|>) (x g) (y g)
+        asum `liftM` sequence c
 #endif
 
 instance (Monad t, Traversable t) => Monad (PromptT a b t) where
@@ -159,7 +165,10 @@ instance (MonadPlus t, Traversable t) => MonadPlus (PromptT a b t) where
     mplus = (<|>)
 #else
     mzero = PromptT $ const (return mzero)
-    mplus (PromptT x) (PromptT y) = PromptT $ \g -> liftM2 mplus (x g) (y g)
+    PromptT x `mplus` PromptT y = PromptT $ \g -> do
+        x' <- x g
+        let c = (return . return <$> x') `mplus` return (y g)
+        msum `liftM` sequence c
 #endif
 
 instance MonadTrans (PromptT a b) where
