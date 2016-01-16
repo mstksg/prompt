@@ -1,6 +1,13 @@
 prompt
 ======
 
+[![prompt on Stackage LTS 2](http://stackage.org/package/prompt/badge/lts-2)](http://stackage.org/lts-2/package/prompt)
+[![prompt on Stackage LTS 3](http://stackage.org/package/prompt/badge/lts-3)](http://stackage.org/lts-3/package/prompt)
+[![prompt on Stackage LTS 4](http://stackage.org/package/prompt/badge/lts-4)](http://stackage.org/lts-4/package/prompt)
+[![prompt on Stackage LTS](http://stackage.org/package/prompt/badge/lts)](http://stackage.org/lts/package/prompt)
+[![prompt on Stackage Nightly](http://stackage.org/package/prompt/badge/nightly)](http://stackage.org/nightly/package/prompt)
+
+
 Lightweight library providing a monad/applicative (and transformer) for
 delayed-effect "pure" prompt-and-respose queries.
 

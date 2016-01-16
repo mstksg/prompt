@@ -307,6 +307,8 @@ runPromptTM (PromptT p) = p
 -- 'Prompt' itself in general has nothing to do with @m@, and cannot
 -- execute arbitrary @m@ other than that given in the prompt response
 -- function.
+--
+-- Effectively treats a @'Prompt' a b@ as a @forall m. ReaderT (a -> m b) m@
 runPromptM :: Monad m
            => Prompt a b r
            -> (a -> m b)   -- ^ "Prompt response function", effectfully
