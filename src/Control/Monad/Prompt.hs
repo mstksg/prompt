@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -61,7 +62,7 @@ module Control.Monad.Prompt (
   ) where
 
 import Control.Applicative
-import Control.Monad hiding       (sequence, mapM, msum)
+import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
@@ -70,11 +71,7 @@ import Control.Monad.Trans
 import Control.Monad.Writer.Class
 import Data.Foldable
 import Data.Functor.Identity
-
-#if !MIN_VERSION_base(4,8,0)
-import Data.Traversable
-import Prelude hiding (sequence, mapM)
-#endif
+import Prelude.Compat
 
 
 -- | Like 'Prompt', but can perform its "pure" computations in the context

@@ -49,6 +49,7 @@ library
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.6 && <5
+                     , base-compat
                      , mtl
                      , transformers
                      , transformers-compat

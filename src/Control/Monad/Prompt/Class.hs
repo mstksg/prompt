@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
@@ -42,6 +43,7 @@ import Control.Monad.Trans.Error
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
+import Prelude.Compat
 import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
 import qualified Control.Monad.Trans.RWS.Strict    as RWSS
 import qualified Control.Monad.Trans.State.Lazy    as SL
@@ -49,10 +51,6 @@ import qualified Control.Monad.Trans.State.Strict  as SS
 import qualified Control.Monad.Trans.Writer.Lazy   as WL
 import qualified Control.Monad.Trans.Writer.Strict as WS
 
-#if !MIN_VERSION_base(4,8,0)
-import Control.Applicative
-import Data.Monoid
-#endif
 
 -- | An 'Applicative' (and possibly 'Monad') where you can, at any time,
 -- "prompt" with an @a@ and receive a @b@ in response.
