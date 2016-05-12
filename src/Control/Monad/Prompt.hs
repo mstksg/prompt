@@ -62,7 +62,7 @@ module Control.Monad.Prompt (
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad.Compat
 import Control.Monad.Error.Class
 import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
