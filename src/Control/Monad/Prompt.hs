@@ -62,7 +62,6 @@ module Control.Monad.Prompt (
   ) where
 
 import Control.Applicative
-import Control.Monad              (MonadPlus(..), liftM, liftM2, join)
 import Control.Monad.Error.Class
 import Control.Monad.Prompt.Class
 import Control.Monad.Reader.Class
@@ -72,6 +71,12 @@ import Control.Monad.Writer.Class
 import Data.Foldable
 import Data.Functor.Identity
 import Prelude.Compat
+
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Monad              (MonadPlus(..), liftM, liftM2, join)
+#else
+import Control.Monad
+#endif
 
 
 -- | Like 'Prompt', but can perform its "pure" computations in the context
