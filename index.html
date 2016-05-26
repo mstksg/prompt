@@ -1,0 +1,18 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>prompt-0.1.1.1: Monad (and transformer) for deferred-effect pure
+prompt-response queries</title><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean" /><script src="haddock-util.js" type="text/javascript"></script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script><script type="text/javascript">//<![CDATA[
+window.onload = function () {pageLoad();};
+//]]>
+</script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">prompt-0.1.1.1: Monad (and transformer) for deferred-effect pure
+prompt-response queries</p></div><div id="content"><div id="description"><h1>prompt-0.1.1.1: Monad (and transformer) for deferred-effect pure
+prompt-response queries</h1><div class="doc"><p>Monad (and transformer) for delayed-effect &quot;pure&quot;
+prompt-and-response queries.</p><p>Allows you to specify programs that might query a
+database, talk to stdio, etc., without ever involving IO
+or opening the door to arbitrary IO.  Write a potentially
+pure computation describing prompting interactions, etc.,
+without having your type actually do any IO or involve
+itself with IO or any effectful context.</p><p>Useful as a source of &quot;things from IO&quot;, without ever
+actually involving IO or arbitrary IO itself; only
+executing a specific subset of IO (or State, etc.) that
+you yourself, the caller, specifies explicitly.  Safer
+and more meaningful type.</p><p>For more information and instructions on usage with
+examples, see <a href="https://github.com/mstksg/prompt">the README</a>.</p><p>Not quite related to the <em>MonadPrompt</em> library.</p></div></div><div id="module-list"><p class="caption">Modules</p><ul><li><span id="control.n.1" class="module collapser" onclick="toggleSection('n.1')">Control</span><ul id="section.n.1" class="show"><li><span id="control.n.1.1" class="module collapser" onclick="toggleSection('n.1.1')">Monad</span><ul id="section.n.1.1" class="show"><li><span class="module"><span id="control.n.1.1.1" class="collapser" onclick="toggleSection('n.1.1.1')">&nbsp;</span><a href="Control-Monad-Prompt.html">Control.Monad.Prompt</a></span> Prompt monad and transformer<ul id="section.n.1.1.1" class="show"><li><span class="module"><a href="Control-Monad-Prompt-Class.html">Control.Monad.Prompt.Class</a></span> Typeclass for contexts with prompting ability.</li></ul></li></ul></li></ul></li></ul></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.17.2</p></div></body></html>
