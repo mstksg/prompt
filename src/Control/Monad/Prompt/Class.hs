@@ -88,7 +88,11 @@ instance (Monad m, MonadPrompt a b m) => MonadPrompt a b (ExceptT e m) where
     prompt    = lift . prompt
     prompts f = lift . prompts f
 
+#if MIN_VERSION_transformers(0,5,0)
 instance (Monad m, MonadPrompt a b m) => MonadPrompt a b (ErrorT e m) where
+#else
+instance (Error e, Monad m, MonadPrompt a b m) => MonadPrompt a b (ErrorT e m) where
+#endif
     prompt    = lift . prompt
     prompts f = lift . prompts f
 
