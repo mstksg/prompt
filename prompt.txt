@@ -24,7 +24,7 @@
 --   
 --   Not quite related to the <i>MonadPrompt</i> library.
 @package prompt
-@version 0.1.1.1
+@version 0.1.1.2
 
 
 -- | Provides a typeclass for <a>Applicative</a> and <a>Monad</a> types
