@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                prompt
-version:             0.1.1.1
+version:             0.1.1.2
 synopsis:            Monad (and transformer) for deferred-effect pure
                      prompt-response queries
 description:         Monad (and transformer) for delayed-effect "pure"
