@@ -11,6 +11,8 @@ Version 0.1.1.1
 
 <https://github.com/mstksg/prompt/releases/tag/v0.1.1.1>
 
+**DEPRECATED**
+
 *   Removed redundant `Error` constraint on `MonadPrompt` instance for
     `ErrorT`.
 
