@@ -88,7 +88,7 @@ instance (Monad m, MonadPrompt a b m) => MonadPrompt a b (ExceptT e m) where
     prompt    = lift . prompt
     prompts f = lift . prompts f
 
-instance (Monad m, MonadPrompt a b m, Error e) => MonadPrompt a b (ErrorT e m) where
+instance (Monad m, MonadPrompt a b m) => MonadPrompt a b (ErrorT e m) where
     prompt    = lift . prompt
     prompts f = lift . prompts f
 
