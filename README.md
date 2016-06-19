@@ -1,11 +1,10 @@
 prompt
 ======
 
-[![prompt on Stackage LTS 2](http://stackage.org/package/prompt/badge/lts-2)](http://stackage.org/lts-2/package/prompt)
-[![prompt on Stackage LTS 3](http://stackage.org/package/prompt/badge/lts-3)](http://stackage.org/lts-3/package/prompt)
-[![prompt on Stackage LTS 4](http://stackage.org/package/prompt/badge/lts-4)](http://stackage.org/lts-4/package/prompt)
+[![prompt on Hackage](https://img.shields.io/hackage/v/prompt.svg?maxAge=2592000)](https://hackage.haskell.org/package/prompt)
 [![prompt on Stackage LTS](http://stackage.org/package/prompt/badge/lts)](http://stackage.org/lts/package/prompt)
 [![prompt on Stackage Nightly](http://stackage.org/package/prompt/badge/nightly)](http://stackage.org/nightly/package/prompt)
+[![Build Status](https://travis-ci.org/mstksg/prompt.svg?branch=master)](https://travis-ci.org/mstksg/prompt)
 
 
 Lightweight library providing a monad/applicative (and transformer) for
